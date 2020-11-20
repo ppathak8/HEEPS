@@ -1,6 +1,5 @@
 from heeps.util.download_from_gdrive import extract_zip
 import astropy.units as u
-import collections
 import os
 import numpy as np
 import proper
@@ -9,15 +8,13 @@ proper.print_it = False
 
 def read_config(verbose=False, **update_conf):
 
-    conf = collections.OrderedDict(
+    conf = dict(
 
     # =============================================================================
     #           Console and file management 
     # =============================================================================
     cpu_count = 1,                      # 1 = single core; None = max-1 cores
-    send_to = None,                     # email for sim end notification
-    send_subject = 'HEEPS noreply',
-    send_message = 'Simulation finished OK.',
+    send_to = None,                     # user's email, for notifications
     prefix = '',                        # for saved files: e.g. 'test_'
     headless = False,                   # true if running on a headless server
     gdrive_id = '1wj3onWQ9GVW-l8X58JMgAj-9TNqalKb-', # Google Drive ID
@@ -70,6 +67,8 @@ def read_config(verbose=False, **update_conf):
     npupil = 285,                       # number of pixels of the pupil
     ndet = 365,                         # size of the detector plane array
     hfov = 1,                           # (optional) half FOV in arcsec (updates ndet)
+    mag = 5,                            # star magnitude at selected band
+    mag_ref = 0,                        # reference magnitude for star and background fluxes
     flux_star = 8.999e+10,              # [e-/s] HCI-L long, mag 0 (Jan 21, 2020)
     flux_bckg = 8.878e+04,              # [e-/s/pix]
     ls_dRext = 0.03,                    # LS Rext undersize (% diam ext)
@@ -88,6 +87,7 @@ def read_config(verbose=False, **update_conf):
     file_app_amp = '',
     app_strehl = 0.64,                   # APP Strehl ratio
     app_single_psf = 0.48,               # APP single PSF (4% leakage)
+    student_distrib = True,              # use Student's distribution instead of Gaussian
     # Multiple spectral bands
     bands = ['L', 'M', 'N1', 'N2'],
     band_specs = {  
@@ -164,7 +164,16 @@ def read_config(verbose=False, **update_conf):
     # =============================================================================
     
     # update conf dictionary
-    conf.update(**update_conf)
+    conf.update(**update_conf)    
+    if verbose is True:
+        print('Read config: band=%s, mode=%s'%(conf['band'], conf['mode']))
+        print('\u203e'*12)
+        print('   npupil=%s, pscale=%s mas, lam=%3.4E m'\
+            %(conf['npupil'], conf['pscale'], conf['lam']))
+        hfov = conf['ndet']/2*conf['pscale']/1e3
+        hfov_lamD = hfov*u.arcsec.to('rad')/(conf['lam']/conf['diam_ext'])
+        print('   ndet=%s, hfov=%s arcsec (%s lam/D)\n'%(conf['ndet'], \
+            round(hfov,2), round(hfov_lamD,2)))
     
     # create directories
     conf['dir_current'] = os.path.normpath(os.path.expandvars(conf['dir_current']))
@@ -187,7 +196,7 @@ def read_config(verbose=False, **update_conf):
     
     # downloading input files from Google Drive
     if not os.path.isfile(conf['file_scao']):
-        print("Downloading input files from Google Drive to '%s'."%conf['dir_input'])
+        print("Downloading input files from Google Drive to \n'%s'\n"%conf['dir_input'])
         extract_zip(conf['gdrive_id'], conf['dir_input'])
     
     # disable matplotlib display to run on a headless server
@@ -195,16 +204,6 @@ def read_config(verbose=False, **update_conf):
         import matplotlib; matplotlib.use('agg')
 
     # sort alphabetically
-    conf = collections.OrderedDict(sorted(conf.items()))
-    
-    if verbose is True:
-        print('\nRead config: mode=%s, band=%s'%(conf['mode'], conf['band']))
-        print('   npupil=%s, pscale=%s mas, lam=%3.4E m'\
-            %(conf['npupil'], conf['pscale'], conf['lam']))
-        hfov = conf['ndet']/2*conf['pscale']/1e3
-        hfov_lamD = hfov*u.arcsec.to('rad')/(conf['lam']/conf['diam_ext'])
-        print('   ndet=%s, hfov=%s arcsec (%s lam/D)'%(conf['ndet'], \
-            round(hfov,2), round(hfov_lamD,2)))
-        print('')
+    conf = {k: v for k, v in sorted(conf.items())}
 
     return conf
